@@ -75,7 +75,7 @@ class Player(Sprite):
        
 
 # platforms
-
+# Creates the platform and creates all the information for each platform. 
 class Platform(Sprite):
     def __init__(self, x, y, w, h, category):
         Sprite.__init__(self)
@@ -135,6 +135,11 @@ class Boundary(Sprite):
 #             self.rect.x += self.speed
 #             if self.rect.x + self.rect.w > WIDTH or self.rect.x < 0:
 #                 self.speed = -self.speed
+
+'''
+creates the mob class and gives it similar properties as the player
+obv, it cant be controlled, but it does move and classifies whether or not it moves vertically or horizontally
+'''
 class Mob(Sprite):
     def __init__(self, x, y, w, h, category):
         Sprite.__init__(self)
@@ -187,6 +192,11 @@ class Mob(Sprite):
 #         self.kind = kind
 #         self.pos = vec(WIDTH/2, HEIGHT/2)
 
+
+'''
+Creates the coin class and tells it to take the image from the mario png in the images folder
+if it needs to move, the category will determine whether or not it is moving. 
+'''
 class Coin(Sprite):
     def __init__(self, x, y, w, h, category):
         Sprite.__init__(self)
