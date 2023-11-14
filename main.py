@@ -1,259 +1,223 @@
 # This file was created by: Roan Kher
+# content from kids can code: http://kidscancode.org/blog/
+
+
+'''
+Goals: Get the coin at the top of the level
+Rules: Jump, move in the air, and don't fall to the bottom of the map
+Feedback: A level progression at the top of the window
+Freedom: Run side to side, jump, drop
+
+Feature Goals: 
+Have certain platforms boost me when I double jump on them
+Have mobs that will hurt me if I touch them
+Add stars that I can get if I reach certain points. 
+
+'''
+
 # import libraries and modules
 import pygame as pg
 from pygame.sprite import Sprite
+
 import random
 from random import randint
 import os
 from settings import *
+from sprites import *
+import math
+from math import floor
+import time
+
+
 vec = pg.math.Vector2
 
 # setup asset folders here - images sounds etc.
 game_folder = os.path.dirname(__file__)
 img_folder = os.path.join(game_folder, 'images')
+snd_folder = os.path.join(game_folder, 'sounds')
 
-
-def draw_text(text, size, color, x, y):
-    font_name = pg.font.match_font('arial')
-    font = pg.font.Font(font_name, size)
-    text_surface = font.render(text, True, color)
-    text_rect = text_surface.get_rect()
-    text_rect.midtop = (x,y)
-    screen.blit(text_surface, text_rect)
-
-class Player(Sprite):
+class Game:
     def __init__(self):
-        Sprite.__init__(self)
-        self.image = pg.Surface((50, 50))
-        self.image.fill(GREEN)
-        # use an image for player sprite...
-        self.image = pg.image.load(os.path.join(img_folder, 'theBell.png')).convert()
-        self.image.set_colorkey(BLACK)
-        self.rect = self.image.get_rect()
-        self.rect.center = (WIDTH/2, HEIGHT/2)
-        self.pos = vec(WIDTH/2, HEIGHT/2)
-        self.vel = vec(0,0)
-        self.acc = vec(0,0)
-        print(self.rect.center)
-        self.hitpoints = 100
-        self.coins = 1
-    def controls(self):
-        keys = pg.key.get_pressed()
-        if keys[pg.K_a]:
-            self.acc.x = -5
-        if keys[pg.K_d]:
-            self.acc.x = 5
-        if keys[pg.K_SPACE]:
-            self.jump()
-    def jump(self):
-        hits = pg.sprite.spritecollide(self, all_platforms, False)
-        if hits:
-            print("i can jump")
-            self.vel.y = -PLAYER_JUMP
-    def update(self):
-        # self.rect.x += 5
-        # self.rect.y += 5
-        self.acc = vec(0,PLAYER_GRAV)
-        self.controls()
-        
-        self.acc.x += self.vel.x * -0.2
-        self.acc.y += self.vel.y * -0.2
-        # equations of motion
-        self.vel += self.acc
-        self.pos += self.vel + 0.5 * self.acc
-        if self.rect.x > WIDTH:
-            self.rect.x = 0
-        if self.rect.y > HEIGHT:
-            self.rect.y = 0
-        self.rect.midbottom = self.pos
-
-# platforms
-
-class Platform(Sprite):
-    def __init__(self, x, y, w, h, category):
-        Sprite.__init__(self)
-        self.image = pg.Surface((w, h))
-        self.image.fill(GREEN)
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
-        print(self.rect.center)
-        self.category = category
-        self.speed = 5
-    def update(self):
-        if self.category == "moving horizontally":
-            self.rect.x += self.speed
-            if self.rect.x > WIDTH or self.rect.x < 0:
-                self.speed = -self.speed
-        if self.category == "moving vertically":
-            self.rect.y += self.speed
-            if self.rect.y > HEIGHT or self.rect.y < 0:
-                self.speed = -self.speed
-    # class JumpPlatform(Sprite)
-    #     # if self.category == "lava":
-        #     self.image.fill(RED)
-        #     self.rect.x += self.speed
-        #     self.rect.y += self.speed
-        #     if self.rect.x > WIDTH or self.rect.x < 0 and self.rect.y > WIDTH or self.rect.y < 0:
-        #         self.speed = -self.speed 
+        # init pygame and create a window
+        pg.init()
+        pg.mixer.init()
+        self.screen = pg.display.set_mode((WIDTH, HEIGHT))
+        pg.display.set_caption("My Game...")
+        self.clock = pg.time.Clock()
+        self.running = True
     
-class Mob(Sprite):
-    def __init__(self, x, y, w, h, category):
-        Sprite.__init__(self)
-        self.image = pg.Surface((w, h))
-        self.image.fill(RED)
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
-        print(self.rect.center)
-        self.category = category
-        self.speed = 5  
-    def update(self):
-        if self.category == "moving horizontally":
-            self.rect.x += self.speed 
-            if self.rect.x > WIDTH or self.rect.x < 0:
-                self.speed = -self.speed
-        if self.category == "moving vertically":
-                self.rect.y += self.speed
-                if self.rect.y > HEIGHT or self.rect.y < 0:
-                    self.speed = -self.speed
-                    self.rect.y += 25
-class Coin(Sprite):
-    def __init__(self, x, y, w, h, category):
-        Sprite.__init__(self)
-        self.image = pg.Surface((w, h))
-        self.image.fill(WHITE)
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
-        print(self.rect.center)
-        self.category = category
-        self.speed = 5  
-    def update(self):
-        if self.category == "moving horizontally":
-            self.rect.x += self.speed 
-            if self.rect.x > WIDTH or self.rect.x < 0:
-                self.speed = -self.speed
-        if self.category == "moving vertically":
-                self.rect.y += self.speed
-                if self.rect.y > HEIGHT or self.rect.y < 0:
-                    self.speed = -self.speed
-                    self.rect.y += 25
+    def new(self):
+        # create a group for all sprites
+        self.score = 10
+        self.coins = 0
+        self.all_sprites = pg.sprite.Group()
+        self.all_platforms = pg.sprite.Group()
+        self.all_mobs = pg.sprite.Group()
+        # self.all_jumpPlatforms = pg.sprite.Group()
+        self.all_Coins = pg.sprite.Group()
+        self.all_Boundaries = pg.sprite.Group()
+        # instantiate classes
+        self.player = Player(self)
+        # add instances to groups
+        self.all_sprites.add(self.player)
 
-
-
-# init pygame and create a window
-pg.init()
-pg.mixer.init()
-screen = pg.display.set_mode((WIDTH, HEIGHT))
-pg.display.set_caption("My Game...")
-clock = pg.time.Clock()
-
-# create a group for all sprites
-all_sprites = pg.sprite.Group()
-all_platforms = pg.sprite.Group()
-all_mobs = pg.sprite.Group()
-all_coins = pg.sprite.Group()
-
-# instantiate classes
-player = Player()
-plat = Platform(150, 300, 100, 30, "normal")
-plat1 = Platform(200, 200, 100, 30, "moving horizontally")
-plat2 = Platform(100, 100, 100, 30, "normal")
-plat3 = Platform (300, 75, 30, 100, "moving vertically")
-coin1 = Coin(250, 50, 25, 25, "normal")
-
-mob1 = Mob(150, 400, 50, 50, "attacking player vertically")
-mob2 = Mob(250, 300, 50, 50, "attacking player horizontally")
-
-
-# # add instances to groups
-all_sprites.add(player)
-all_sprites.add(plat)
-all_sprites.add(plat1)
-all_sprites.add(plat2)
-all_sprites.add(plat3)
-all_sprites.add(coin1)
-
-all_platforms.add(plat)
-all_platforms.add(plat1)
-all_platforms.add(plat2)
-all_platforms.add(plat3)
-all_coins.add(coin1)
-
-
-
-for i in range(0,3):
-    m = Mob(randint(0,WIDTH), randint(0,HEIGHT,), 25, 25, "moving horizontally")
-    all_sprites.add(m)
-    all_mobs.add(m)
-for i in range(0,3):
-    m = Mob(randint(0,WIDTH), randint(0,HEIGHT,), 25, 25, "moving vertically")
-    all_sprites.add(m)
-    all_mobs.add(m)
-for plat in PLATFORM_LIST: 
-    p = Platform(*plat)
-    all_sprites.add(p)
-    all_platforms.add(p)
-
-
-# Game loop
-running = True
-while running:
-    # keep the loop running using clock
-    clock.tick(FPS)
+        for p in PLATFORM_LIST:
+            # instantiation of the Platform class
+            plat = Platform(*p)
+            self.all_sprites.add(plat)
+            self.all_platforms.add(plat)
         
-    for event in pg.event.get():
-        # check for closed window
-        if event.type == pg.QUIT:
-            running = False
-    
-    ############ Update ##############
-    # update all sprites
-    all_sprites.update()
-    if player.rect.y > HEIGHT:
-         player.pos = vec(WIDTH/2, HEIGHT/2)
-         print ("ive fallen and I cant get up")
-         SCORE -= 1
+        # for j in JUMPPLATFORM_LIST:
+        #     jump = jumpPlatform(*j)
+        #     self.all_sprites.add(jump)
+        #     self.all_jumpPlatforms.add(jump)
 
-    # this is what prevents the player from falling through the platform when falling down...
-    if player.vel.y > 0:
-            hits = pg.sprite.spritecollide(player, all_platforms, False)
-            if hits:
-                player.pos.y = hits[0].rect.top
-                player.vel.y = 0
+        # taking the mobs from the Mob List in settings.py and putting them in the game
+        for m in MOB_LIST:
+            mobs = Mob(*m)
+            self.all_sprites.add(mobs)
+            self.all_mobs.add(mobs)
+        # taking the coins from the Coins List in settings.py and putting them in the game
+        for c in COIN_LIST: 
+            coin = Coin(*c)
+            self.all_sprites.add(coin)
+            self.all_Coins.add(coin)
+        # taking the Boundary from the Boundary List in settings.py and putting them in the game
+        for bound in BOUND_LIST:
+            boundaries = Boundary(*bound)
+            self.all_sprites.add(boundaries)
+            self.all_Boundaries.add(boundaries)
+
+
+        # for m in range(0,10):
+        #     m = Mob(randint(0, WIDTH), randint(0, math.floor(HEIGHT/2)), 20, 20, "normal")
+        #     self.all_sprites.add(m)
+        #     self.all_mobs.add(m)
+
+        self.run()
+    
+    def run(self):
+        self.playing = True
+        while self.playing:
+            self.clock.tick(FPS)
+            self.events()
+            self.update()
+            self.draw()
+
+    def update(self):
+        self.all_sprites.update()
+
+        # Given to me by Sean Daly: When the character's x position goes off the side of the screen, it appears on the other side of the screen. 
+        if self.player.pos.x < 0:
+            self.player.pos.x = WIDTH
+        if self.player.pos.x > WIDTH:
+            self.player.pos.x = 0
+
+        # this is what prevents the player from falling through the platform when falling down...
+        if self.player.vel.y >= 0:
+            phits = pg.sprite.spritecollide(self.player, self.all_platforms, False)
+            if phits:
+                self.player.pos.y = phits[0].rect.top
+                self.player.vel.y = 0
+                self.player.vel.x = phits[0].speed*1.5
+        
+
+                    
+         # this prevents the player from jumping up through a platform
+        elif self.player.vel.y <= 0:
+            # when the player collides with a mob, its score decreases by 1. 
+            mhits = pg.sprite.spritecollide(self.player, self.all_mobs, False)
+            if mhits:
+                self.player.acc.y = 5
+                self.player.vel.y = 0
+                print("ouch")
+                self.score -= 1
+                if self.player.rect.bottom >= mhits[0].rect.top - 1:
+                    self.player.rect.top = mhits[0].rect.bottom
+
+        # elif self.player.vel.y <= 0:
+        #     jhits = pg.sprite.spritecollide(self.player, self.all_jumpPlatforms, True)
+        #     if jhits:
+        #         self.player.acc.y = 5
+        #         self.player.vel.y = 0
+        #         if self.player.rect.bottom >= mhits[0].rect.top - 1:
+        #             self.player.rect.top = mhits[0].rect.bottom
+
+        
+                
+        # when the player comes into contact with a coin, the coin will disappear and the player's coin count will go up. 
+        chits = pg.sprite.spritecollide(self.player, self.all_Coins, True)
+        if chits:
+            print("i got a coin!")
+            self.coins += 1
+        
+        # using the boundary class, whenever the player's x and y position meets a boundary, their score will tick down by 1 point each second.
+        bhits = pg.sprite.spritecollide(self.player, self.all_Boundaries, False)
+        if bhits: 
+            if self.player.cd.delta == 1:
+                print (self.player.cd.delta)
+                self.player.cd.event_reset()
+                self.score -= 1
+                print ("this is working...")
+        # when the player's score reaches 0, they will be teleported back to their starting position
+        # I was trying to get it to display a message about how the person playing had lost and clear all the platforms, but I never got it to work.
+        if self.score == 0:
+            self.draw_text(" UH OH, YOU LOST ", 36, RED, WIDTH/2, HEIGHT/2)
+            self.player.pos = vec(WIDTH/2, HEIGHT*3/4)
+            self.score = 10
+            
+
+        
+            
+
+        # when the player's score is 0, their position resets to the starting position and their score resets back to ten. 
+        # if self.score == 0:
+        #     self.draw_text ("UH OH, YOU LOST", 36, RED, WIDTH/2, HEIGHT/2)
+        #     self.player.pos = vec(WIDTH/2, HEIGHT*3/4)
+        #     self.score = 10
+
+
 
                 
-    # this prevents the player from jumping up through a platform
-    if player.vel.y < 0:
-        hits = pg.sprite.spritecollide(player, all_platforms, False)
-        if hits:
-            print("ouch")
-            SCORE -= 1
-            if player.rect.bottom >= hits[0].rect.top - 5:
-                player.rect.top = hits[0].rect.bottom
-                player.acc.y = 5
-                player.vel.y = 0
+                
+
+
+    def events(self):
+        for event in pg.event.get():
+        # check for closed window
+            if event.type == pg.QUIT:
+                if self.playing:
+                    self.playing = False
+                self.running = False
+                
+    def draw(self):
+        ############ Draw ################
+        # draw the background screen
+        self.screen.fill(BLACK)
+        # draw all sprites
+        self.all_sprites.draw(self.screen)
+        self.draw_text("Score: " + str(self.score), 22, WHITE, WIDTH/2, HEIGHT/10)
+        self.draw_text("Coins: " + str(self.coins), 22, WHITE, WIDTH/2, HEIGHT/20)
+        # buffer - after drawing everything, flip displayd
+        pg.display.flip()
     
-    mhits = pg.sprite.spritecollide(player, all_mobs, False)
-    if mhits:
-        print ("Ive collided with a mob")
-        player.hitpoints -= 10
-    mtokens = pg.sprite.spritecollide(player, all_coins, False)
-    if mtokens:
-        print ("I just got a coin!")
-        player.coins += 1
+    # this allows us to draw text in the window
+    def draw_text(self, text, size, color, x, y):
+        font_name = pg.font.match_font('arial')
+        font = pg.font.Font(font_name, size)
+        text_surface = font.render(text, True, color)
+        text_rect = text_surface.get_rect()
+        text_rect.midtop = (x,y)
+        self.screen.blit(text_surface, text_rect)
 
-    ############ Draw ################
-    # draw the background screen
-    screen.fill(BLACK)
-    # draw all sprites
-    all_sprites.draw(screen)
-    draw_text("Score: " + str(SCORE), 22, WHITE, WIDTH/2, HEIGHT/10)
-    draw_text("Hitpoints: " + str(player.hitpoints), 22, WHITE, WIDTH/2, HEIGHT/15)
-    draw_text("Coins: " + str(player.coins), 22, WHITE, WIDTH/2, HEIGHT/30)
+    def show_start_screen(self):
+        pass
+    def show_go_screen(self):
+        pass
 
-    # buffer - after drawing everything, flip display
-    pg.display.flip()
+g = Game()
+while g.running:
+    g.new()
+
 
 pg.quit()
